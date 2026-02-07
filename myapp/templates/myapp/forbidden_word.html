@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h1>禁句ワード登録</h1>
+
+    <!-- 禁句ワードを登録するフォーム -->
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">登録</button>
+    </form>
+
+    <h2>登録済みの禁句ワード一覧</h2>
+    <!-- ここで forbidden_words をループして表示 -->
+    <ul>
+       {% for word in forbidden_words %}
+           <li>{{ word.word }}</li>
+       {% empty %}
+           <li>まだ禁句ワードが登録されていません。 </li>
+       {% endfor %}
+    </ul>
+</body>
+</html>

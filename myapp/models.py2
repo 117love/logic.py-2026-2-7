@@ -1,0 +1,11 @@
+from django.db import models
+from django.contrib.auth.models import User # ユーザー情報を紐付けたい場合
+
+class DiaryEntry(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True) # オプション
+    contect = models.TextField("内容")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="投稿日時")
+
+    def __str__(self):
+        # 長すぎる場合は先頭50文字のみ表示
+        return self.contect[:50]

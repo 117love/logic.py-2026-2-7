@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyApp Index</title>
+</head>
+<body>
+    <h1>寛容アプリ</h1>
+
+<form method="post">
+    {% csrf_token %}
+
+  <p>
+    <label>出来事</label><br>
+    <select name="style">
+      <option>タメ語</option>
+      <option>敬吾</option>
+      <option>混合</option>  
+    </select>
+  </p> 
+
+  <button type="submit">送信</button>
+</form>
+ 
+{% if style %}
+  <p>選ばれた話し方:{{ style }}</p>
+{% endif %}  
+</body>
+</html>

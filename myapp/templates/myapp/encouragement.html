@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>励ましの言葉</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f8ff;
+            text-align: center;
+            padding:20px;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .encouragement-list {
+           list-style: none;
+           padding: 0;
+        }
+
+        .encouragement-item {
+            background: #ffffff;
+            padding: 15px;
+            margin: 10px auto;
+            width: 80%;
+            max-width: 400px;
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+            font-size: 18px;
+            display: block;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #007bff;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+        .back-link:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>励ましの言葉</h1>
+
+    <!-- エラーメッセージの表示を追加 -->
+    {% if error_message %}
+        <div style="color: red; margin-top: 10px;">
+            {{ error_message }}
+        </div>
+    {% endif %}
+
+    <!-- 成功メッセージの表示 -->
+    {% if success_message %}
+        <div style="color: green; margin-top: 10px;">
+            {{ success_message }}
+        </div>
+    {% endif %}
+
+    <!-- 励ましの言葉の投稿フォーム -->
+    <form method="post" action="{% url 'encouragement_view' %}">
+        {% csrf_token %}
+        <input type="text" name="message" placeholder="励ましの言葉を入力" required>
+
+        <!-- 話し方選択用ドロップダウンを追加 -->
+        <select name="style" required>
+            <option value="" selected disabled>選択して下さい</option>
+            <option value="mix">混合</option>
+            <option value="keigo">敬語</option>
+            <option value="tamego">タメ語</option>
+        </select>
+
+        <button type="submit">投稿</button>
+    </form>
+
+
+
+    <ul class="encouragement-list">
+        {% for encouragement in encouragements %}
+            <li class="encouragement-item">{{ encouragement.message }}</li>
+        {% empty %}
+        <li class="encouragement-item">まだ励ましの言葉が登録されていません。 </li>
+        {% endfor %}
+    </ul>
+    <a href="{% url 'index' %}" class="back-link">戻る</a>
+</body>
+</html>
