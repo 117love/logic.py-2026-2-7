@@ -6,13 +6,14 @@ from typing import Dict, List, Optional
 # 1. 状況をまとめる
 # Djangoでは入力フォームの値を context に入れて渡せばOK
 # 
-def collect_datailed_context() -> Dict[str, str]:
+def collect_datailed_context(data: dict) -> Dict[str, str]:
+    # Djangoの from.cleaned_data やrequest.POST を渡せる形
     context = {}
-    context["when"] = input("いつ？(例:今日の昼、昨日など): ").strip()
-    context["where"] = input("どこで？(例: 職場、学校など): ").strip()
-    context["who"] = input("誰に？(例:上司、先輩、友達、同僚など): ").strip()
-    context["what"] = input("どんな言動をされた？: ").strip()
-    context["mood"] = input("どんな気分？(例: 怒り/悲しみ/悔しさ/不安/疲れ など): ").strip()
+    context["when"] = (data.get("when") or "" ).strip()
+    context["where"] = (data.get("where") or "").strip()
+    context["who"] = (data.get("who") or "").strip()
+    context["what"] = (data.get("what") or "").strip()
+    context["mood"] = (data.get("mood") or "").strip()
     return context
 
 #
