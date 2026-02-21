@@ -14,17 +14,25 @@
   <p>
     <label>出来事</label><br>
     <select name="style">
-      <option>タメ語</option>
-      <option>敬吾</option>
-      <option>混合</option>  
+      <option value="casual">タメ語</option>
+      <option value="polite">敬吾</option>
+      <option value="mix">混合</option>
+      <option value="kansai">関西弁</option>  
     </select>
-  </p> 
+    </p>
+    
+    <p>
+      <label>出来事</label><br>
+      <textarea name="what" rows="4" cols="40"></textarea>
+    </p>
 
   <button type="submit">送信</button>
 </form>
  
-{% if style %}
-  <p>選ばれた話し方:{{ style }}</p>
-{% endif %}  
+{% if reply %}
+<hr>
+<h3>励ましメッセージ</h3>
+<p>{{ reply }}</p>
+{% endif %}
 </body>
 </html>
