@@ -2,21 +2,25 @@
 import random
 from typing import Dict, List, Optional
 
+VALID_STYLE = {"polite", "casual", "mix", "kansai"}
+
+def normalize_style(style: str) -> str:
+    if style in VALID_STYLE:
+        return style
+    return "polite"
+
 # 
 # 1. 状況をまとめる
-# Djangoでは入力フォームの値を context に入れて渡せばOK
-# 
-def collect_datailed_context(data: dict) -> Dict[str, str]:
-    # Djangoの from.cleaned_data やrequest.POST を渡せる形
-    context = {}
-    context["when"] = (data.get("when") or "" ).strip()
-    context["where"] = (data.get("where") or "").strip()
-    context["who"] = (data.get("who") or "").strip()
-    context["what"] = (data.get("what") or "").strip()
-    context["mood"] = (data.get("mood") or "").strip()
-    return context
+def collect_detailed_context(data: dict) -> Dict[str, str]:
+    return {
+        "when":  (data.get("when") or "" ).strip(),
+        "where":  (data.get("where") or "").strip(),
+        "who": (data.get("who") or "").strip(),
+        "what": (data.get("what") or "").strip(),
+        "mood": (data.get("mood") or "").strip(),
+        "history": []
+    }
 
-#
 # 2) 禁止語句チェック(共通)
 #
 def contains_banned_word(text: str, banned_words: List[str]) -> bool:
@@ -34,106 +38,141 @@ def filter_output(reply: str, output_banned_words: List[str]) -> Optional[str]:
 
 #
 # 3) 口調変換(敬吾/タメ語/混合/関西弁)
-#
 def apply_style(text: str, style: str) -> str:
+    style = normalize_style(style)
+
     if style == "polite":
         return text
-    
-    #　追加:関西弁(強め)
+       
     if style == "kansai":
-        return (
-            text.replace("ですね。", "やな。")
-                .replace("ですよね。", "やんな")
-                .replace("ます。", "するで。")
-                .replace("でした。", "やったで。")
-                .replace("大変でしたね。", "めっちゃしんどかったなぁ。")
-                .replace("それはしんどかったですね。", "それはしんどかったなぁ。")
-                .replace("ますよね。", "やんな。")
-                .replace("ますね。", "るなぁ。")
-                .replace("ません。", "へん。")
-                .replace("ですか？", "なん？")
-                .replace("ですか。", "なん")
-                .replace("ました。", "たで。")
-                .replace("ました", "たで")            
-        )
+        replacements = {
+            "ですね。": "やな。",
+            "ですよね。": "やんな",
+            "ます。": "するで。",
+            "でした。": "やったで。",
+            "ますよね。": "やんな。",
+            "ますね。": "るなぁ。",
+            "ません。": "へん。",
+            "ですか？": "なん？",            
+        }
     
-    if style == "casual":
-        return (
-            text.replace("ですよね。", "だよね。")
-                .replace("ですね。", "だね。")
-                .replace("です", "だよ。")
-                .replace("ます", "るよ。")
-                )
+    elif style == "casual":
+        replacements = {
+            "ですよね。": "だよね。",
+            "ですね。": "だね。",
+            "です": "だよ。",
+            "ます": "るよ。",
+            "ました。": "たよ。",
+            "でした。": "だった。",
+        }        
 
-    if style == "mix":
-        # 丁寧を残しつつ、少しだけ距離を縮める
-        # (置き換えを増やすほど、"混合感が出ます)
-        return (
-            text.replace("ですね。", "やね。")
-                .replace("ですよね。", "やんな.")
-                .replace("大変でしたね。", "しんどかったな。")
-        )
+    elif style == "mix":
+        replacements = {
+            "ですね。": "やね。",
+            "ですよね。": "やんな。",
+            "でしたね。": "やったな。",
+        }
+
+    else:
+        return text
+
+    for before, after in replacements.items():
+        text = text.replace(before, after)
 
     return text    
 
 
-
-#
 # 4) 返答生成(共感 → 要約 → 質問)
-# 
-def generate_reply_from_context(context: Dict[str, str], style: str) -> str:
-    when = context.get("when", "")
-    where = context.get("where", "")
-    who = context.get("who", "")
-    what = context.get("what", "")
-    mood = context.get("mood", "")
+def generate_summary(context: Dict[str, str], style: str) -> str:
+    style = normalize_style(style)
 
-    empathy = {
-        "怒": ["それは腹が立ちますね。", "それはイラッとしますよね。"],
-        "悲": ["それは悲しくなりますよね。", "それは気持ちが沈みますよね。"],
-        "悔": ["それは悔しい気持ちになりますよね。", "それは気が済まないですよね。"],
-        "不安": ["それは不安になりますよね。", "その状況、落ち着かないですよね。"],
-        "疲": {"それは疲れが溜まりますよね。", "それは消耗しますよね。"},
+    history = context.get("history", [])
 
-    }
+    history_text = ""
+    if history:
+        history_text += "これまでの会話:\n"
+        for h in history[-6:]:
+            role = "あなた" if h["role"] == "user" else "アプリ"
+            history_text += f"{role}: {h['content']}\n"
+        history_text += "\n"    
 
-    key = None
-    for k in empathy.keys():
-        if k in mood:
-            break
-        
-    empathy_line = random.choice(empathy[key]) if key else "それはしんどかったですね。"
+    when = context.get("when", "").strip()
+    where = context.get("where", "").strip()
+    who = context.get("who", "").strip()
+    what = context.get("what", "").strip()
 
-    if style == "kansai":
-        summary_line = f"今日、{where}で、{who}から「{what}」って事があったんやな。"
+    base = ""
+
+    if when:
+        base += f"{when}"
+
+    if where:
+        if base:
+            base += "、"
+        if where.endswith("で"):    
+            base += f"{where}で"
+        else:
+            base += f"{where}で"        
+
+    if who:
+        if base:
+            base += "、"
+        base += f"{who}に"
+
+    if what:
+        if base:
+            base += f"「{what}」って事があった"
+        else:
+            base = f"「{what}」って事があった"
+
+    
+
+    #--- 文末スタイル ---         
+    if style == "polite":
+        summary = f"{base}んですね。"
+        empathy = "それはとても辛かったですね。"
+        follow = "その後どうされましたか？"
+
     elif style == "casual":
-        summary_line = f"今日、{where}で、{who}に「{what}」って事があったんだね。"
+        summary = f"{base}んだね。"
+        empathy = "それは辛かったよね。"
+        follow = "その後どうしたの？"
+
+    elif style == "kansai":
+        summary = f"{base}んやな。"
+        empathy = "それはほんまにしんどかったな。"
+        follow = "その後どないしたん？"
+
     elif style == "mix":
-        summary_line = f"今日、{where}で、{who}から「{what}」という出来事があったんだね。"
-    else:  # polite
-        summary_line = f"本日, {where}で、{who}から「{what}」という出来事があったのですね。"            
+        summary = f"{base}んですね。"
+        empathy = "それは辛かったですね。"
+        follow = "その後はどうしたんですか？"
 
-    return f"{empathy_line}\n{summary_line}"
+    else:
+        summary = base
+        empathy = ""
+        follow = ""
 
-#
+    return f"{history_text}{summary}\n{empathy}\n{follow}"                    
+
 # 5) 最終応答（B：返答側の禁句語句を絶対に含めない)
-#
 def respond_with_safety(
     context: Dict[str, str],
     style: str,
     output_banned_words: List[str],
     retries: int = 5
 ) -> str:
-    # 何度か言い換えを試す　(会話が途切れにくくなる)
+    
+    style = normalize_style(style)
+    
     for _ in range(retries):
-        reply = generate_reply_from_context(context, style)
-        reply = apply_style(reply, style)
+        reply = generate_summary(context, style)
         filtered = filter_output(reply, output_banned_words)
         if filtered is not None:
             return filtered
 
-    # 最後の砦(この文言自体も禁句チェック)
     fallback = "今はうまく言葉が見つかりませんが、あなたの話は大切に受け止めています。"
     if contains_banned_word(fallback, output_banned_words):
         return "" # どうしてもダメなら空文字 (表示しない)
+    
     return fallback
