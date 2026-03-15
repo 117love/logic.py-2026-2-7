@@ -47,7 +47,7 @@ def apply_style(text: str, style: str) -> str:
     if style == "kansai":
         replacements = {
             "ですね。": "やな。",
-            "ですよね。": "やんな",
+            "ですよね。": "やんな。",
             "ます。": "するで。",
             "でした。": "やったで。",
             "ますよね。": "やんな。",
