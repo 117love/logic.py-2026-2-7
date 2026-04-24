@@ -1,178 +1,234 @@
-# logic.py
-import random
+import re
 from typing import Dict, List, Optional
 
 VALID_STYLE = {"polite", "casual", "mix", "kansai"}
+
 
 def normalize_style(style: str) -> str:
     if style in VALID_STYLE:
         return style
     return "polite"
 
-# 
-# 1. 状況をまとめる
+
+# 1) 状況をまとめる
 def collect_detailed_context(data: dict) -> Dict[str, str]:
     return {
-        "when":  (data.get("when") or "" ).strip(),
-        "where":  (data.get("where") or "").strip(),
+        "when": (data.get("when") or "").strip(),
+        "where": (data.get("where") or "").strip(),
         "who": (data.get("who") or "").strip(),
         "what": (data.get("what") or "").strip(),
         "mood": (data.get("mood") or "").strip(),
-        "history": []
+        "history": data.get("history", []),
     }
 
-# 2) 禁止語句チェック(共通)
-#
+
+# 2) 禁止語句チェック
 def contains_banned_word(text: str, banned_words: List[str]) -> bool:
     if not text or not banned_words:
         return False
+    
     for w in banned_words:
         w = (w or "").strip()
         if w and w in text:
             return True
+        
     return False
-    
-def filter_output(reply: str, output_banned_words: List[str]) -> Optional[str]:
-    return None if contains_banned_word(reply, output_banned_words) else reply   
-    
 
-#
-# 3) 口調変換(敬吾/タメ語/混合/関西弁)
+
+def filter_output(reply: str, output_banned_words: List[str]) -> Optional[str]:
+    return None if contains_banned_word(reply, output_banned_words) else reply
+                
+
+
+# 3) 口調変換
 def apply_style(text: str, style: str) -> str:
     style = normalize_style(style)
 
-    if style == "polite":
+    if not text:
         return text
-       
-    if style == "kansai":
-        replacements = {
-            "ですね。": "やな。",
-            "ですよね。": "やんな。",
-            "ます。": "するで。",
-            "でした。": "やったで。",
-            "ますよね。": "やんな。",
-            "ますね。": "るなぁ。",
-            "ません。": "へん。",
-            "ですか？": "なん？",            
-        }
     
-    elif style == "casual":
-        replacements = {
-            "ですよね。": "だよね。",
-            "ですね。": "だね。",
-            "です": "だよ。",
-            "ます": "るよ。",
-            "ました。": "たよ。",
-            "でした。": "だった。",
-        }        
-
-    elif style == "mix":
-        replacements = {
-            "ですね。": "やね。",
-            "ですよね。": "やんな。",
-            "でしたね。": "やったな。",
-        }
-
-    else:
-        return text
-
-    for before, after in replacements.items():
-        text = text.replace(before, after)
-
-    return text    
+    if style == "polite":
+        return force_polite(text)
+    
+    if style == "casual":
+        return force_casual(text)
+    
+    if style == "kansai":
+        return force_kansai(text)
+    
+    if style == "mix":
+        return force_mix(text)
+    
+    return force_polite(text)
 
 
-# 4) 返答生成(共感 → 要約 → 質問)
+def force_polite(text: str) -> str:
+    replacements = {
+        "やんな。": "ですよね。",
+        "やな。": "ですね。",
+        "やで。": "ですよ。",
+        "やったで。": "でした。",
+        "やったな。": "でしたね。",
+        "なん？": "ですか？",
+        "だよね。": "ですよね。",
+        "だね。": "ですね。",
+        "だよ。": "ですよ。",
+        "だった。": "でした。",
+        "だったね。": "でしたね。",
+        "なの？": "ですか？",
+    }
+
+    for old, new in sorted(replacements.items(), key=lambda x: len(x[0]), reverse=True):
+        text = text.replace(old, new)
+
+    return text
+
+
+def force_casual(text: str) -> str:
+    text = force_polite(text)
+
+    replacements = {
+        "ですよね。": "だよね。",
+        "ですね。": "だね。",
+        "ですよ。": "だよ。",
+        "です。": "だよ。",
+        "でしたね。": "だったね。",
+        "でした。": "だった。",
+        "ますよね。": "るよね。",
+        "ますね。": "るね。",
+        "ます。": "るよ。",
+        "ました。": "たよ。",
+        "ません。": "ないよ。",
+        "ですか？": "なの？",
+        "どうされましたか？": "どうしたの？",
+        "どうしましたか？": "どうしたの？",
+        "辛かったですね": "辛かったね。",
+        "大変でしたね": "大変だったね。",
+    }
+
+    for old, new in sorted(replacements.items(), key=lambda x: len(x[0]), reverse=True):
+        text = text.replace(old, new)
+
+    return text
+
+def force_kansai(text: str) -> str:
+    text = force_polite(text)
+
+    replacements = {
+        "ですよね。": "やんな。",
+        "ですね。": "やな。",
+        "ですよ。": "やで。",
+        "です。": "やで。",
+        "でしたね。": "やったな。",
+        "ますよね。": "るよな。",
+        "ますね。": "るな。",
+        "ます。": "るで。",
+        "ました。": "たで。",
+        "ません。": "へん。",
+        "ですか？": "なん？",
+        "どうされましたか？": "どないしたん？",
+        "どうしましたか？": "どないしたん？",
+        "辛かったですね。": "しんどかったな。",
+        "大変でしたね。": "大変やったな。",
+    }
+
+    for old, new in sorted(replacements.items(), key=lambda x: len(x[0]), reverse=True):
+        text = text.replace(old, new)
+
+    return text
+
+
+def force_mix(text: str) -> str:
+    # 関西弁は混ぜないので、まず敬語ベースに戻す
+    text = force_polite(text)
+
+    sentences = re.split(r'(?<=[。！？])', text)
+    result = []
+
+    for i, s in enumerate(sentences):
+        s = s.strip()
+        if not s:
+            continue
+
+        # 偶数文は敬語、奇数文はタメ語
+
+        if  i % 2 == 0:
+            result.append(force_polite(s))
+        else:
+            result.append(force_casual(s))
+
+    return "".join(result)
+
+
+# 4) 返答生成
 def generate_summary(context: Dict[str, str], style: str) -> str:
     style = normalize_style(style)
 
     history = context.get("history", [])
-
-    history_text = ""
-    if history:
-        history_text += "これまでの会話:\n"
-        for h in history[-6:]:
-            role = "あなた" if h["role"] == "user" else "アプリ"
-            history_text += f"{role}: {h['content']}\n"
-        history_text += "\n"    
-
     when = context.get("when", "").strip()
     where = context.get("where", "").strip()
     who = context.get("who", "").strip()
     what = context.get("what", "").strip()
+    mood = context.get("mood", "").strip()
+    follow_up = context.get("follow_up", "").strip()
 
-    base = ""
+    parts = []
 
     if when:
-        base += f"{when}"
-
+        parts.append(when)
     if where:
-        if base:
-            base += "、"
-        if where.endswith("で"):    
-            base += f"{where}で"
-        else:
-            base += f"{where}で"        
-
+        parts.append(where)
     if who:
-        if base:
-            base += "、"
-        base += f"{who}に"
+        parts.append(who)
 
-    if what:
-        if base:
-            base += f"「{what}」って事があった"
-        else:
-            base = f"「{what}」って事があった"
+    scene = ""
+    if parts:
+        scene = "、".join(parts)
 
-    
-
-    #--- 文末スタイル ---         
-    if style == "polite":
-        summary = f"{base}んですね。"
-        empathy = "それはとても辛かったですね。"
-        follow = "その後どうされましたか？"
-
-    elif style == "casual":
-        summary = f"{base}んだね。"
-        empathy = "それは辛かったよね。"
-        follow = "その後どうしたの？"
-
-    elif style == "kansai":
-        summary = f"{base}んやな。"
-        empathy = "それはほんまにしんどかったな。"
-        follow = "その後どないしたん？"
-
-    elif style == "mix":
-        summary = f"{base}んですね。"
-        empathy = "それは辛かったですね。"
-        follow = "その後はどうしたんですか？"
-
+    summary = ""
+    if scene and what:
+        summary = f"{scene}で、「{what}」って事があったんですね。"
+    elif what:
+        summary = f"「{what}」って事があったんですね。"
     else:
-        summary = base
-        empathy = ""
-        follow = ""
+        summary = "話して下さった出来事があったんですね。"
 
-    return f"{history_text}{summary}\n{empathy}\n{follow}"                    
+    empathy = "それは辛かったですね。"
 
-# 5) 最終応答（B：返答側の禁句語句を絶対に含めない)
+    if mood:
+        empathy = f"「{mood}」って感じたんですね。それは辛かったですね。"
+
+    follow = "その後どうしましたか？"
+
+    if follow_up:
+        summary = f"{summary}\nその後「{follow_up}」という流れもあったんですね。"
+        follow = "その時、1番強かった気持ちはどんな気持ちでしたか？"
+
+    reply = f"{summary}\n{empathy}\n{follow}"
+    reply = apply_style(reply, style)
+    return reply
+
+
+# 5) 最終応答
 def respond_with_safety(
     context: Dict[str, str],
     style: str,
     output_banned_words: List[str],
-    retries: int = 5
+    retries: int = 5    
 ) -> str:
-    
     style = normalize_style(style)
-    
+
     for _ in range(retries):
         reply = generate_summary(context, style)
         filtered = filter_output(reply, output_banned_words)
         if filtered is not None:
             return filtered
+        
 
-    fallback = "今はうまく言葉が見つかりませんが、あなたの話は大切に受け止めています。"
+    fallback = "今は言葉がうまく見つかりませんが、あなたの話を大切に受け止めています。"
+    fallback = apply_style(fallback, style)
+
     if contains_banned_word(fallback, output_banned_words):
-        return "" # どうしてもダメなら空文字 (表示しない)
-    
+        return ""
+
     return fallback
